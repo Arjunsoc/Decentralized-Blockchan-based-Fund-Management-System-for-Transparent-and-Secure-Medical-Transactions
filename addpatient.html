@@ -1,0 +1,240 @@
+{% extends 'main_app/base_index.html' %}
+{% block scripts %}
+
+<script src="https://cdn.jsdelivr.net/npm/web3@1.7.5/dist/web3.min.js"></script>
+
+
+<script >
+
+//IMAGE AND IPFS
+  var ipfsHash;
+  function setIpsfHash(hash){
+    ipfsHash = hash;
+  }
+  function getIpfsHash(){
+    return ipfsHash;
+  }
+
+  if (typeof window.ethereum !== 'undefined') {
+  window.web3 = new Web3(window.ethereum);
+  window.ethereum.request({ method: 'eth_requestAccounts' });
+} else {
+  alert("Please install MetaMask to interact with the app.");
+}
+  const ipfs = window.IpfsHttpClient({
+  host: 'localhost',
+  port: '5001',
+  protocol: 'http'
+  });
+
+
+  
+  $("document").ready(function(){
+
+    $("#upload").change(function() {
+       $("#link").text("LOADING YOUR IPFS HASH...DON'T SUBMIT THE FORM")
+       const reader = new FileReader();
+reader.onload = function (e) {
+  const bufferData = buffer.Buffer(reader.result);
+
+  ipfs.add(bufferData, (err, result) => {
+    if (err || !result || !result[0] || !result[0].hash) {
+      console.error("IPFS Upload Error:", err || result);
+      $("#link").text("IPFS Upload Failed. Try again.");
+      return;
+    }
+
+    const hash = result[0].hash;
+    const ipfsLink = `https://ipfs.io/ipfs/${hash}`;
+
+    $("#hash").text("IPFS HASH: " + hash);
+    $("#link").html(`IPFS HASH RECEIVED. <a href='${ipfsLink}' target='_blank'>View File</a>`);
+
+    setIpsfHash(hash);
+  });
+};
+reader.readAsArrayBuffer(this.files[0]);
+
+    });
+});
+      
+// CONTRACT INSTANCES
+let contractInstance;
+
+async function initContract() {
+  if (typeof window.ethereum === 'undefined') {
+    alert("Please install MetaMask to use this app.");
+    return;
+  }
+
+  const web3 = new Web3(window.ethereum);
+  await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+  const abiResponse = await fetch('/get-abi/');
+  const abi = await abiResponse.json();
+
+  const contractAddress = "0xd6535aBd73D1461a7B93BfD8061d96FFDAC0141a";
+  contractInstance = new web3.eth.Contract(abi, contractAddress);
+
+  const pidCount = await contractInstance.methods.pidCount().call();
+  console.log("PID Count from contract:", pidCount);
+}
+document.addEventListener("DOMContentLoaded", initContract);
+function waitForReceipt(hash, cb) {
+    web3.eth.getTransactionReceipt(hash, function (err, receipt) {
+      if (err) {
+        error(err);
+      }
+      if (receipt !== null) {
+        // Transaction went through
+        if (cb) {
+          cb(receipt);
+        }
+      } else {
+        // Try again in 1 second
+        window.setTimeout(function () {
+          waitForReceipt(hash, cb);
+        }, 1000);
+      }
+    });
+  }
+  $(document).ready(function(){
+    $('#myForm').on('submit',function(e){
+        e.preventDefault();
+        var name = $('#name').val()
+        var disease = $('#disease').val()
+        var amount = $('#amount').val()
+        var hash = getIpfsHash()
+
+        
+  web3.eth.getAccounts(function get(err, res){
+          account = res[0]
+
+        transaction = 
+        ({
+          from: account,
+          value: web3.utils.toWei(amount.toString(), 'ether'),
+          "gas": 900000,
+          "chainId": 3,
+          'gasPrice': web3.utils.toWei('60','Gwei'),
+        })
+
+        contractInstance.methods.setPatientData(name, disease, hash)
+        .send({
+          from: account,
+          value: web3.utils.toWei(amount.toString(), 'ether'),
+          gas: 900000,
+          gasPrice: web3.utils.toWei('60', 'Gwei'),
+        })
+        .then((receipt) => {
+          console.log("✅ Transaction successful:", receipt);
+        })
+        .catch((err) => {
+          console.error("❌ Transaction failed:", err);
+        }
+        )
+      })
+    });
+});
+
+
+</script>
+
+{% endblock scripts %}
+{% block content %}
+
+
+  <section class="mb-5" style="margin-top: 50px">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-6 mb-5">
+          <h1 class="display-4">New Patient Entry Form</h1>
+         
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="probootstrap-services">
+    <div class="container">
+      <div class="row no-gutters">
+        <div class="col-md-3 pb-5 probootstrap-aside-stretch-left probootstrap-inside">
+          <div class="mb-3 pt-5">
+            <h2 class="h1">Important Note</h2>
+            <ul class="list-unstyled probootstrap-light mb-4">
+              <h2 class="h5">Only the Owner of the Contract has the access to use this functionality.<br><br>If you aren't the owner, DO NOT PROCEED</h2>
+
+              <li><a href="{% url 'base' %}">Go Back</a></li>
+  
+            </ul>
+          </div>
+        </div>
+        <div class="col-md-9 pl-md-5 pb-5 pl-0 probootstrap-inside">
+          <h1 class="mt-4 mb-4" style="font-weight: bold;">Add a New Patient</h1>
+          <div class="row">
+            <div class="col-md-12">
+              <form id="myForm" method="POST" class="probootstrap-form">
+
+                {% csrf_token %}
+                <div class="form-group">
+                  <label for="name" class="sr-only">Patient's Name</label>
+                  <input type="text" class="form-control" id="name" placeholder="Enter Patient's name">
+                </div>
+                <div class="form-group">
+                  <label for="email" class="sr-only">Patient's Disease</label>
+                  <input type="text" class="form-control" id="disease" placeholder="Enter the Disease of the Patient">
+                </div>
+                <div class="form-group">
+                  <label for="message" class="sr-only">Insured Amount</label>
+                  <input name="message" id="amount" class="form-control" placeholder="Enter the Insurance Amount"></input>
+                </div>
+              <div class="row d-flex justify-content-around">
+                <div  >
+                  <h3 style="font-weight: bold;">Upload Medical Certificate</h3>
+                </div>
+                <div>
+                  <input type="file" id="upload"><br> 
+                </div>
+              </div>
+                 
+                <h4 id="hash" style="font-style: italic; font-weight: bold; margin-top: 20px"></h4>
+
+                 <h4 id="link" style="font-style: italic; font-weight: bold; text-align: center; margin-top: 20px"></h4>
+
+                <div class="form-group">
+                  <input type="submit" class="btn btn-primary" value="Add Patient" style="margin-top: 60px">
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+
+  <section class="probootstrap-subscribe">
+    <div class="container-fluid">
+      <div class="row mb-5">
+        <div class="col-md-12">
+          <h2 class="h1 text-white">Subscribe Newsletter</h2>
+          <p class="lead text-white">Far far away, behind the word mountains, far from the countries Vokalia.</p>
+        </div>
+      </div>
+      <form action="#" method="post">
+        <div class="row">
+          <div class="col-md-4">
+            <input type="text" class="form-control" placeholder="Name">    
+          </div>
+          <div class="col-md-4 mb-md-0 mb-3">
+            <input type="text" class="form-control" placeholder="Email">
+          </div>
+          <div class="col-md-4">
+            <input type="submit" value="Subscribe" class="btn btn-primary btn-block">
+          </div>
+        
+        </div>
+      </form>
+    </div>
+  </section>
+{% endblock %}
+
