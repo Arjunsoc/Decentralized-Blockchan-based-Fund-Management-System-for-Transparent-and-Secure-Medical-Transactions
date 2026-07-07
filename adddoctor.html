@@ -1,0 +1,137 @@
+{% extends 'main_app/base_index.html' %}
+{% load static %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
+<script>
+  const address = "0xd6535aBd73D1461a7B93BfD8061d96FFDAC0141a";
+  let contract;
+
+  window.addEventListener("load", async () => {
+    if (window.ethereum) {
+      window.web3 = new Web3(window.ethereum);
+      await window.ethereum.enable();
+
+      const res = await fetch("{% static 'js/HealthCareStore.json' %}");
+      const json = await res.json();
+      const abi = json.abi;
+      contract = new web3.eth.Contract(abi, address);
+    } else {
+      alert("Please install MetaMask");
+    }
+  });
+
+  $(document).ready(function () {
+    $('#myForm').on('submit', async function (e) {
+      e.preventDefault();
+
+      const name = $('#name').val();
+      const designation = $('#disease').val(); // I know, weird ID
+      const docAddress = $('#amount').val(); // Misleading ID, maybe rename to 'docAddress'
+
+      const accounts = await web3.eth.getAccounts();
+      const account = accounts[0];
+
+      try {
+        const tx = await contract.methods
+          .setDoctor(docAddress, name, designation)
+          .send({
+            from: account,
+            gas: 900000,
+            gasPrice: web3.utils.toWei("60", "gwei"),
+          });
+
+        console.log("✅ Doctor added!", tx);
+        alert("Doctor successfully added!");
+      } catch (err) {
+        console.error("❌ Error:", err);
+        alert("Something went wrong. Check console.");
+      }
+    });
+  });
+</script>
+
+
+{% endblock scripts %}
+{% block content %}
+
+
+  <section class="mb-5" style="margin-top: 50px">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-6 mb-5">
+          <h1 class="display-4">New Doctor Entry Form</h1>
+        
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="probootstrap-services">
+    <div class="container">
+      <div class="row no-gutters">
+        <div class="col-md-3 pb-5 probootstrap-aside-stretch-left probootstrap-inside">
+          <div class="mb-3 pt-5">
+            <h2 class="h1">Important Note</h2>
+            <ul class="list-unstyled probootstrap-light mb-4">
+              <h2 class="h5">Only the Owner of the Contract has the access to use this functionality.<br><br>If you aren't the owner, DO NOT PROCEED</h2>
+
+              <li><a href="{% url 'base' %}">Go Back</a></li>
+  
+            </ul>
+          </div>
+        </div>
+        <div class="col-md-9 pl-md-5 pb-5 pl-0 probootstrap-inside">
+          <h1 class="mt-4 mb-4">Add a New Doctor</h1>
+          <div class="row">
+            <div class="col-md-12">
+              <form id="myForm" action="#" method="post" class="probootstrap-form">
+
+                {% csrf_token %}
+                <div class="form-group">
+                  <label for="name" class="sr-only">Doctor's Name</label>
+                  <input type="text" class="form-control" id="name" placeholder="Enter Doctor's name">
+                </div>
+                <div class="form-group">
+                  <label for="email" class="sr-only">Doctor's Designation</label>
+                  <input type="text" class="form-control" id="disease" placeholder="Enter the Doctor's Designation">
+                </div>
+                <div class="form-group">
+                  <label for="message" class="sr-only">Doctor's Public Address</label>
+                  <input name="message" id="amount" class="form-control" placeholder="Enter the Doctor's Public Address"></input>
+                </div>
+                <div class="form-group">
+                  <input type="submit" class="btn btn-primary" value="Add Doctor">
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+
+  <section class="probootstrap-subscribe">
+    <div class="container-fluid">
+      <div class="row mb-5">
+        <div class="col-md-12">
+          <h2 class="h1 text-white">Subscribe Newsletter</h2>
+          <p class="lead text-white">Far far away, behind the word mountains, far from the countries Vokalia.</p>
+        </div>
+      </div>
+      <form action="#" method="post">
+        <div class="row">
+          <div class="col-md-4">
+            <input type="text" class="form-control" placeholder="Name">    
+          </div>
+          <div class="col-md-4 mb-md-0 mb-3">
+            <input type="text" class="form-control" placeholder="Email">
+          </div>
+          <div class="col-md-4">
+            <input type="submit" value="Subscribe" class="btn btn-primary btn-block">
+          </div>
+        
+        </div>
+      </form>
+    </div>
+  </section>
+{% endblock %}
